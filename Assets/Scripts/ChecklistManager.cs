@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -64,7 +65,7 @@ public class ChecklistManager : MonoBehaviour {
         // Determine the index for the new item
         int index = 0;
         if(checklistObjects.Count > 0) {
-            index = checklistObjects.Count - 1;
+            index = checklistObjects.Count;
         }
         
         // Set the details of the new checklist item
@@ -79,13 +80,37 @@ public class ChecklistManager : MonoBehaviour {
         // Add a listener to handle changes in the checklist item's toggle state
         itemObject.GetComponent<Toggle>().onValueChanged.AddListener(delegate {CheckItem(temp); });
 
+        SaveJSONData();
+
         // Switch back to the regular checklist view
         SwitchMode(0);
     }
+
+    IEnumerator DestroyAfterDelay(GameObject item, float delay) {
+    // Wait for the specified delay
+    yield return new WaitForSeconds(delay);
+
+    // Destroy the item
+    Destroy(item);
+    }
+
+    float timeToDestroy = 0.5f;
 
     // Method to handle checklist item changes
     void CheckItem(ChecklistObject item) {
         // Remove the item from the list of checklist items
         checklistObjects.Remove(item);
+
+        StartCoroutine(DestroyAfterDelay(item.gameObject, timeToDestroy));
+    }
+
+    void SaveJSONData() {
+        string contents = "";
+
+        for (int i = 0; i < checklistObjects.Count; i++) {
+            contents += JsonUtility.ToJson(checklistObjects[i]) + "\n";
+        }
+
+        File.WriteAllText(filePath, contents);
     }
 }
