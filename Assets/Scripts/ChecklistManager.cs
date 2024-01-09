@@ -22,10 +22,25 @@ public class ChecklistManager : MonoBehaviour {
     // Array for storing input fields from the addPanel
     private TMP_InputField[] addInputFields;
 
+    public class ChecklistItem {
+        public string objName;
+        public string type;
+        public int index;
+
+        public ChecklistItem (string name, string content, int index) {
+        objName = name;
+        type = content;
+        this.index = index;
+    }
+
+    }
+
     // Start is called before the first frame update
     private void Start() {
         // Set the file path for saving checklist data
         filePath = Application.persistentDataPath + "/checklist.txt";
+
+        LoadJSONData();
 
         // Get all InputField components from addPanel
         addInputFields = addPanel.GetComponentsInChildren<TMP_InputField>();
@@ -52,7 +67,7 @@ public class ChecklistManager : MonoBehaviour {
     }
 
     // Method to create a new checklist item
-    void CreateChecklistItem(string name, string type) {
+    void CreateChecklistItem(string name, string type, int loadIndex = 0, bool loading = false) {
         // Create a new checklist item from the prefab
         GameObject item = Instantiate(checklistItemPrefab);
 
@@ -63,11 +78,12 @@ public class ChecklistManager : MonoBehaviour {
         ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
 
         // Determine the index for the new item
-        int index = 0;
-        if(checklistObjects.Count > 0) {
+
+        int index = loadIndex;
+        if (!loading) {
             index = checklistObjects.Count;
         }
-        
+            
         // Set the details of the new checklist item
         itemObject.SetObjectInfo(name, type, index);
 
@@ -80,10 +96,11 @@ public class ChecklistManager : MonoBehaviour {
         // Add a listener to handle changes in the checklist item's toggle state
         itemObject.GetComponent<Toggle>().onValueChanged.AddListener(delegate {CheckItem(temp); });
 
-        SaveJSONData();
-
-        // Switch back to the regular checklist view
-        SwitchMode(0);
+        if (!loading) {
+            SaveJSONData();
+            // Switch back to the regular checklist view
+            SwitchMode(0);
+        }
     }
 
     IEnumerator DestroyAfterDelay(GameObject item, float delay) {
@@ -100,7 +117,7 @@ public class ChecklistManager : MonoBehaviour {
     void CheckItem(ChecklistObject item) {
         // Remove the item from the list of checklist items
         checklistObjects.Remove(item);
-
+        SaveJSONData();
         StartCoroutine(DestroyAfterDelay(item.gameObject, timeToDestroy));
     }
 
@@ -108,9 +125,29 @@ public class ChecklistManager : MonoBehaviour {
         string contents = "";
 
         for (int i = 0; i < checklistObjects.Count; i++) {
-            contents += JsonUtility.ToJson(checklistObjects[i]) + "\n";
+            ChecklistItem temp = new ChecklistItem(checklistObjects[i].objName, checklistObjects[i].type, checklistObjects[i].index);
+            contents += JsonUtility.ToJson(temp) + "\n";
         }
 
         File.WriteAllText(filePath, contents);
+    }
+
+    void LoadJSONData () {
+        if (File.Exists(filePath)) {
+            string contents = File.ReadAllText(filePath);
+            string[] splitContents = contents.Split('\n');
+
+            foreach (string content in splitContents) {
+                if (content.Trim() != "") {
+                    ChecklistItem temp = JsonUtility.FromJson<ChecklistItem>(content);
+                    CreateChecklistItem(temp.objName, temp.type, temp.index, true);
+                }
+                
+            }
+            
+        }else{
+            Debug.Log("No file");
+        }
+        
     }
 }
