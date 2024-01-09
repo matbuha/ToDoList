@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2102057637934969690}
   - component: {fileID: 8081459286635573874}
   m_Layer: 5
-  m_Name: checklistItemPrefab
+  m_Name: checklistItem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -99,8 +99,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: edaead8b0c83edb43823440aecac0683, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  objectTitle: 
-  content: 
+  objName: 
+  type: 
   index: 0
 --- !u!1 &8407957864752805371
 GameObject:

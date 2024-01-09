@@ -2,12 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class ChecklistManager : MonoBehaviour {
 
     // Public variables for linking Unity objects and UI elements
     public Transform content; // Parent transform for checklist items
     public GameObject addPanel; // Panel for adding new checklist items
+    public Button addButton;
     public Button createButton; // Button to create a new checklist item
     public GameObject checklistItemPrefab; // Prefab for checklist items
 
@@ -17,7 +19,7 @@ public class ChecklistManager : MonoBehaviour {
     private List<ChecklistObject> checklistObjects = new List<ChecklistObject>();
 
     // Array for storing input fields from the addPanel
-    private InputField[] addInputFields;
+    private TMP_InputField[] addInputFields;
 
     // Start is called before the first frame update
     private void Start() {
@@ -25,14 +27,10 @@ public class ChecklistManager : MonoBehaviour {
         filePath = Application.persistentDataPath + "/checklist.txt";
 
         // Get all InputField components from addPanel
-        addInputFields = addPanel.GetComponentsInChildren<InputField>();
-
-        // Add a listener to the createButton to call CreateChecklistItem when clicked
-        if (addInputFields != null && addInputFields.Length >= 2) {
-            createButton.onClick.AddListener(delegate {CreateChecklistItem(addInputFields[0].text, addInputFields[1].text); });
-        } else {
-            Debug.LogError("Not enough input fields found in addPanel.");
-        }
+        addInputFields = addPanel.GetComponentsInChildren<TMP_InputField>();
+        
+        createButton.onClick.AddListener(delegate {CreateChecklistItem(addInputFields[0].text, addInputFields[1].text); });
+        
     }
 
     // Method to switch between different UI modes
@@ -41,11 +39,13 @@ public class ChecklistManager : MonoBehaviour {
             // Mode 0: Regular checklist view
             case 0:
                 addPanel.SetActive(false); // Hide the addPanel
+                addButton.gameObject.SetActive(true);
                 break;
             
             // Mode 1: Adding a new checklist item
             case 1:
                 addPanel.SetActive(true); // Show the addPanel
+                addButton.gameObject.SetActive(false);
                 break;
         }
     }
