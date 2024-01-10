@@ -21,6 +21,4 @@ public class ChecklistObject : MonoBehaviour {
         type = content;
         this.index = index;
     }
-
-
 }
