@@ -10,10 +10,10 @@ public class ChecklistManager : MonoBehaviour {
     // Public variables for linking Unity objects and UI elements
     public Transform content; // Parent transform for checklist items
     public GameObject addPanel; // Panel for adding new checklist items
-    public GameObject openPanel; // Panel for open existing checklist items
     public Button addButton;
     public Button createButton; // Button to create a new checklist item
     public GameObject checklistItemPrefab; // Prefab for checklist items
+
 
     string filePath; // Path for saving checklist data
 
@@ -65,11 +65,6 @@ public class ChecklistManager : MonoBehaviour {
                 addButton.gameObject.SetActive(false);
                 break;
 
-            // Mode 2: Open exist checklist item
-            case 2:
-                openPanel.SetActive(true); // Show the openPanel
-                addButton.gameObject.SetActive(false);
-                break;
         }
     }
 
