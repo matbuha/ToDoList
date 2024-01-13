@@ -161,22 +161,15 @@ public class ChecklistManager : MonoBehaviour {
     }
 
     public void SetUser(string userId) {
-    // Clear existing tasks
-    checklistObjects.Clear();
+        string userFolderPath = Application.persistentDataPath + "/" + userId;
+        Directory.CreateDirectory(userFolderPath);  // Create the directory if it doesn't exist
 
-    // Clear UI
-    ClearUI();
-
-    // Update the file path for the new user
-    filePath = Application.persistentDataPath + "/" + userId + "_checklist.txt";
-
-    // Reload tasks for the new user
-    LoadJSONData();
+        filePath = userFolderPath + "/" + userId + "_checklist.txt";
+        LoadJSONData();
     }
 
     public void ClearUserData() {
         checklistObjects.Clear();
-        // Optionally, clear the UI as well
     }
 
 }

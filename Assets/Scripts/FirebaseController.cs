@@ -15,7 +15,7 @@ public class FirebaseController : MonoBehaviour {
 
     private FirebaseUser user;
     private FirebaseAuth auth;
-    public GameObject loginPanel, signupPanel, mainPagePanel, forgetPasswordPanel, notificationPanel;
+    public GameObject loginPage, createUserPage, mainPage, forgotPassPage, notificationPanel;
     public TMP_InputField loginEmail, loginPassword, signupEmail, signupPassword,signupConfirmPassword, signupUserName,forgetPassEmail;
     public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text;
     // public Toggle rememberMe;
@@ -42,31 +42,31 @@ public class FirebaseController : MonoBehaviour {
 
 
     public void OpenLoginPanel () {
-        loginPanel.SetActive(true);
-        signupPanel.SetActive(false);
-        mainPagePanel.SetActive(false);
-        forgetPasswordPanel.SetActive(false);
+        loginPage.SetActive(true);
+        createUserPage.SetActive(false);
+        mainPage.SetActive(false);
+        forgotPassPage.SetActive(false);
     }
 
     public void OpenSignUpPanel () {
-        loginPanel.SetActive(false);
-        signupPanel.SetActive(true);
-        mainPagePanel.SetActive(false);
-        forgetPasswordPanel.SetActive(false);
+        loginPage.SetActive(false);
+        createUserPage.SetActive(true);
+        mainPage.SetActive(false);
+        forgotPassPage.SetActive(false);
     }
 
     public void OpenMainPagePanel () {
-        loginPanel.SetActive(false);
-        signupPanel.SetActive(false);
-        mainPagePanel.SetActive(true);
-        forgetPasswordPanel.SetActive(false);
+        loginPage.SetActive(false);
+        createUserPage.SetActive(false);
+        mainPage.SetActive(true);
+        forgotPassPage.SetActive(false);
     }
 
     public void OpenforgetPassPanel () {
-        loginPanel.SetActive(false);
-        signupPanel.SetActive(false);
-        mainPagePanel.SetActive(false);
-        forgetPasswordPanel.SetActive(true);
+        loginPage.SetActive(false);
+        createUserPage.SetActive(false);
+        mainPage.SetActive(false);
+        forgotPassPage.SetActive(true);
     }
 
     public void LogInUser() {
@@ -120,11 +120,18 @@ public class FirebaseController : MonoBehaviour {
         auth.SignOut();
         profileUserEmail_Text.text = "";
         profileUserName_Text.text = "";
-        
-        OpenLoginPanel();
+
+        // Find the ChecklistManager instance and call the clear methods
+        var checklistManager = FindObjectOfType<ChecklistManager>();
+        if (checklistManager != null) {
+            checklistManager.ClearUI();        // Clear the UI elements
+            checklistManager.ClearUserData();  // Clear the data
+        }
 
         // Reset ChecklistManager
         FindObjectOfType<ChecklistManager>()?.ClearUserData();
+        FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
+        OpenLoginPanel();
     }
 
 
@@ -159,6 +166,10 @@ public class FirebaseController : MonoBehaviour {
     }
 
     public void SignInUser (string email, string password) {
+        // Before setting the new user, clear existing data
+        FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
+        FindObjectOfType<ChecklistManager>()?.ClearUserData();
+        
         auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled) {
                 Debug.LogError("SignInWithEmailAndPasswordAsync was canceled.");
@@ -188,6 +199,7 @@ public class FirebaseController : MonoBehaviour {
 
             // Notify ChecklistManager about the user change
             FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
+            FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
         });
     }
 

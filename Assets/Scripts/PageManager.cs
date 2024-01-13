@@ -4,11 +4,7 @@ using UnityEngine;
 
 public class PageManager : MonoBehaviour {
     // References to the page panels
-    public GameObject mainPage;
-    public GameObject profilePage;
-    public GameObject loginPage;
-    public GameObject createUserPage;
-    public GameObject forgotPassPage;
+    public GameObject mainPage, profilePage, loginPage, createUserPage, forgotPassPage;
 
     // Method to show a specific page and hide others
     public void ShowPage(string pageName) {
