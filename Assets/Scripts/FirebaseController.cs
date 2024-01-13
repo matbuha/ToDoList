@@ -12,6 +12,8 @@ using Firebase.Extensions;
 
 public class FirebaseController : MonoBehaviour {
 
+    public PageManager pageManager; // add a reference to the PageManager script
+
 
     private FirebaseUser user;
     private FirebaseAuth auth;
@@ -38,35 +40,27 @@ public class FirebaseController : MonoBehaviour {
                     // Firebase Unity SDK is not safe to use here.
             }
         });
+
+        if (pageManager == null) {
+            pageManager = FindObjectOfType<PageManager>();
+        }
     }
 
 
-    public void OpenLoginPanel () {
-        loginPage.SetActive(true);
-        createUserPage.SetActive(false);
-        mainPage.SetActive(false);
-        forgotPassPage.SetActive(false);
+    public void OpenLoginPage () {
+        pageManager.ShowPage("LoginPage");
     }
 
-    public void OpenSignUpPanel () {
-        loginPage.SetActive(false);
-        createUserPage.SetActive(true);
-        mainPage.SetActive(false);
-        forgotPassPage.SetActive(false);
+    public void OpenCreateUserPage () {
+        pageManager.ShowPage("CreateUserPage");
     }
 
-    public void OpenMainPagePanel () {
-        loginPage.SetActive(false);
-        createUserPage.SetActive(false);
-        mainPage.SetActive(true);
-        forgotPassPage.SetActive(false);
+    public void OpenMainPage () {
+        pageManager.ShowPage("MainPage");
     }
 
-    public void OpenforgetPassPanel () {
-        loginPage.SetActive(false);
-        createUserPage.SetActive(false);
-        mainPage.SetActive(false);
-        forgotPassPage.SetActive(true);
+    public void OpenforgetPassPage () {
+        pageManager.ShowPage("ForgotPassPage");
     }
 
     public void LogInUser() {
@@ -88,7 +82,7 @@ public class FirebaseController : MonoBehaviour {
         }
 
         CreateUser(signupEmail.text, signupPassword.text, signupUserName.text);
-        OpenLoginPanel ();
+        OpenLoginPage ();
     }
 
     public void forgetPass() {
@@ -99,7 +93,7 @@ public class FirebaseController : MonoBehaviour {
         }
 
         forgetPasswordSubmit(forgetPassEmail.text);
-        OpenLoginPanel ();
+        OpenLoginPage();
     }
 
     private void showNotifactionMessage(string title, string message) {
@@ -131,7 +125,7 @@ public class FirebaseController : MonoBehaviour {
         // Reset ChecklistManager
         FindObjectOfType<ChecklistManager>()?.ClearUserData();
         FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
-        OpenLoginPanel();
+        OpenLoginPage();
     }
 
 
@@ -195,7 +189,7 @@ public class FirebaseController : MonoBehaviour {
                 
             profileUserName_Text.text = "" + newUser.User.DisplayName;
             profileUserEmail_Text.text  = "" + newUser.User.Email;
-            OpenMainPagePanel();
+            OpenMainPage();
 
             // Notify ChecklistManager about the user change
             FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
@@ -262,7 +256,7 @@ public class FirebaseController : MonoBehaviour {
                 isSigned = true;
                 profileUserName_Text.text = "" + user.DisplayName;
                 profileUserEmail_Text.text  = "" + user.Email;
-                OpenMainPagePanel();
+                OpenMainPage();
             }
         }
     }
