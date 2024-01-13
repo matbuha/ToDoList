@@ -1,4 +1,4 @@
-/*using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -18,7 +18,7 @@ public class FirebaseController : MonoBehaviour {
     public GameObject loginPanel, signupPanel, mainPagePanel, forgetPasswordPanel, notificationPanel;
     public TMP_InputField loginEmail, loginPassword, signupEmail, signupPassword,signupConfirmPassword, signupUserName,forgetPassEmail;
     public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text;
-    public Toggle rememberMe;
+    // public Toggle rememberMe;
     bool isSignIn = false;
 
 
@@ -55,7 +55,7 @@ public class FirebaseController : MonoBehaviour {
         forgetPasswordPanel.SetActive(false);
     }
 
-    public void OpenProfilePagePanel () {
+    public void OpenMainPagePanel () {
         loginPanel.SetActive(false);
         signupPanel.SetActive(false);
         mainPagePanel.SetActive(true);
@@ -88,6 +88,7 @@ public class FirebaseController : MonoBehaviour {
         }
 
         CreateUser(signupEmail.text, signupPassword.text, signupUserName.text);
+        OpenLoginPanel ();
     }
 
     public void forgetPass() {
@@ -98,6 +99,7 @@ public class FirebaseController : MonoBehaviour {
         }
 
         forgetPasswordSubmit(forgetPassEmail.text);
+        OpenLoginPanel ();
     }
 
     private void showNotifactionMessage(string title, string message) {
@@ -120,6 +122,9 @@ public class FirebaseController : MonoBehaviour {
         profileUserName_Text.text = "";
         
         OpenLoginPanel();
+
+        // Reset ChecklistManager
+        FindObjectOfType<ChecklistManager>()?.ClearUserData();
     }
 
 
@@ -179,7 +184,10 @@ public class FirebaseController : MonoBehaviour {
                 
             profileUserName_Text.text = "" + newUser.User.DisplayName;
             profileUserEmail_Text.text  = "" + newUser.User.Email;
-            OpenProfilePagePanel();
+            OpenMainPagePanel();
+
+            // Notify ChecklistManager about the user change
+            FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
         });
     }
 
@@ -242,7 +250,7 @@ public class FirebaseController : MonoBehaviour {
                 isSigned = true;
                 profileUserName_Text.text = "" + user.DisplayName;
                 profileUserEmail_Text.text  = "" + user.Email;
-                OpenProfilePagePanel();
+                OpenMainPagePanel();
             }
         }
     }
@@ -320,10 +328,6 @@ public class FirebaseController : MonoBehaviour {
                     password = javaClass.CallStatic<string>("getUserPassword", context);
                 }
             }
-
-            // Now you have your email and password, handle them accordingly
-            Debug.Log("Email: " + email + ", Password: " + password);
-            // Autofill or whatever you need to do with them
         }
     }
-}*/
+}

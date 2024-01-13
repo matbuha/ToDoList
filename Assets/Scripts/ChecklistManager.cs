@@ -4,6 +4,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Firebase.Auth;
 
 public class ChecklistManager : MonoBehaviour {
 
@@ -39,8 +40,8 @@ public class ChecklistManager : MonoBehaviour {
     // Start is called before the first frame update
     private void Start() {
         // Set the file path for saving checklist data
-        filePath = Application.persistentDataPath + "/checklist.txt";
-
+        var userId = FirebaseAuth.DefaultInstance.CurrentUser?.UserId;
+        filePath = Application.persistentDataPath + "/" + userId + "_checklist.txt";
         LoadJSONData();
 
         // Get all InputField components from addPanel
@@ -148,8 +149,34 @@ public class ChecklistManager : MonoBehaviour {
             }
             
         }else{
-            Debug.Log("No file");
+            Debug.Log("No file for user. This might be the first login.");
         }
         
     }
+
+    public void ClearUI() {
+        foreach (Transform child in content) {
+            Destroy(child.gameObject);
+        }
+    }
+
+    public void SetUser(string userId) {
+    // Clear existing tasks
+    checklistObjects.Clear();
+
+    // Clear UI
+    ClearUI();
+
+    // Update the file path for the new user
+    filePath = Application.persistentDataPath + "/" + userId + "_checklist.txt";
+
+    // Reload tasks for the new user
+    LoadJSONData();
+    }
+
+    public void ClearUserData() {
+        checklistObjects.Clear();
+        // Optionally, clear the UI as well
+    }
+
 }
