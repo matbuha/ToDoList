@@ -14,13 +14,11 @@ public class FirebaseController : MonoBehaviour {
 
     public PageManager pageManager; // add a reference to the PageManager script
 
-
     private FirebaseUser user;
     private FirebaseAuth auth;
     public GameObject loginPage, createUserPage, mainPage, forgotPassPage, notificationPanel;
     public TMP_InputField loginEmail, loginPassword, signupEmail, signupPassword,signupConfirmPassword, signupUserName,forgetPassEmail;
     public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text;
-    // public Toggle rememberMe;
     bool isSignIn = false;
 
 
@@ -51,16 +49,8 @@ public class FirebaseController : MonoBehaviour {
         pageManager.ShowPage("LoginPage");
     }
 
-    public void OpenCreateUserPage () {
-        pageManager.ShowPage("CreateUserPage");
-    }
-
     public void OpenMainPage () {
         pageManager.ShowPage("MainPage");
-    }
-
-    public void OpenforgetPassPage () {
-        pageManager.ShowPage("ForgotPassPage");
     }
 
     public void LogInUser() {
@@ -68,9 +58,9 @@ public class FirebaseController : MonoBehaviour {
 
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
             return;
+        }else{
+            SignInUser(loginEmail.text, loginPassword.text);
         }
-
-        SignInUser(loginEmail.text, loginPassword.text);
     }
 
     public void SignUpUser() {
@@ -79,10 +69,9 @@ public class FirebaseController : MonoBehaviour {
 
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
             return;
+        }else{
+            CreateUser(signupEmail.text, signupPassword.text, signupUserName.text);
         }
-
-        CreateUser(signupEmail.text, signupPassword.text, signupUserName.text);
-        OpenLoginPage ();
     }
 
     public void forgetPass() {
@@ -90,10 +79,9 @@ public class FirebaseController : MonoBehaviour {
 
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
             return;
+        }else{
+            forgetPasswordSubmit(forgetPassEmail.text);
         }
-
-        forgetPasswordSubmit(forgetPassEmail.text);
-        OpenLoginPage();
     }
 
     private void showNotifactionMessage(string title, string message) {
@@ -135,65 +123,48 @@ public class FirebaseController : MonoBehaviour {
                 Debug.LogError("CreateUserWithEmailAndPasswordAsync was canceled.");
                 return;
             }
-            if (task.IsFaulted) {
-                Debug.LogError("CreateUserWithEmailAndPasswordAsync encountered an error: " + task.Exception);
 
-                foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
-                    FirebaseException firebaseEx = exception as FirebaseException;
-                        if (firebaseEx != null) {
-                            var errorCode = (AuthError)firebaseEx.ErrorCode;
-                            showNotifactionMessage("Error", GetErrorMessage(errorCode));
-                        }
-                }
-
-                return;
-            }
-
-
-            // Firebase user has been created.
-            AuthResult result = task.Result;
-            Debug.LogFormat("Firebase user created successfully: {0} ({1})",
-                result.User.DisplayName, result.User.UserId);
+            HandleFirebaseException(task);
+            
+            if (task.IsCompleted) {
+                // Firebase user has been created.
+                AuthResult result = task.Result;
+                Debug.LogFormat("Firebase user created successfully: {0} ({1})",
+                    result.User.DisplayName, result.User.UserId);
 
                 UpdateUserProfile(UserName);
+                OpenLoginPage ();
+            }
         });
     }
 
-    public void SignInUser (string email, string password) {
+    void SignInUser (string email, string password) {
         // Before setting the new user, clear existing data
         FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
         FindObjectOfType<ChecklistManager>()?.ClearUserData();
-        
+
+
         auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled) {
                 Debug.LogError("SignInWithEmailAndPasswordAsync was canceled.");
                 return;
             }
-            if (task.IsFaulted) {
-                Debug.LogError("SignInWithEmailAndPasswordAsync encountered an error: " + task.Exception);
 
-                foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
-                    FirebaseException firebaseEx = exception as FirebaseException;
-                        if (firebaseEx != null) {
-                            var errorCode = (AuthError)firebaseEx.ErrorCode;
-                            showNotifactionMessage("Error", GetErrorMessage(errorCode));
-                        }
-                }
+            HandleFirebaseException(task);
 
-                return;
+            if (task.IsCompleted) {
+                AuthResult newUser = task.Result;
+                Debug.LogFormat("User signed in successfully: {0} ({1})",
+                    newUser.User.DisplayName, newUser.User.UserId);
+                    
+                profileUserName_Text.text = "" + newUser.User.DisplayName;
+                profileUserEmail_Text.text  = "" + newUser.User.Email;
+                OpenMainPage();
+
+                // Notify ChecklistManager about the user change
+                FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
+                FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
             }
-
-            AuthResult newUser = task.Result;
-            Debug.LogFormat("User signed in successfully: {0} ({1})",
-                newUser.User.DisplayName, newUser.User.UserId);
-                
-            profileUserName_Text.text = "" + newUser.User.DisplayName;
-            profileUserEmail_Text.text  = "" + newUser.User.Email;
-            OpenMainPage();
-
-            // Notify ChecklistManager about the user change
-            FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
-            FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
         });
     }
 
@@ -261,6 +232,18 @@ public class FirebaseController : MonoBehaviour {
         }
     }
 
+    private void HandleFirebaseException(Task task) {
+        if (task.IsFaulted) {
+            foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
+                FirebaseException firebaseEx = exception as FirebaseException;
+                if (firebaseEx != null) {
+                    var errorCode = (AuthError)firebaseEx.ErrorCode;
+                    showNotifactionMessage("Error", GetErrorMessage(errorCode));
+                }
+            }
+        }
+    }
+
     private static string GetErrorMessage(AuthError errorCode) {
         var message = "";
         switch (errorCode)
@@ -298,18 +281,12 @@ public class FirebaseController : MonoBehaviour {
             if(task.IsCanceled) {
                 Debug.LogError("SendPasswordResetEmailAsyn was canceled");
             }
-
-            if(task.IsFaulted) {
-                foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
-                    FirebaseException firebaseEx = exception as FirebaseException;
-                        if (firebaseEx != null) {
-                            var errorCode = (AuthError)firebaseEx.ErrorCode;
-                            showNotifactionMessage("Error", GetErrorMessage(errorCode));
-                        }
-                }
+            
+            HandleFirebaseException(task);
+            
+            if (task.IsCompleted) {
+                showNotifactionMessage("Alert", "Check Your Email For Further Instructions");
             }
-
-            showNotifactionMessage("Alert", "Check Your Email For Further Instructions");
         });
     }
 

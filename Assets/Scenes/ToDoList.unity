@@ -11999,10 +11999,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14017d70037f8e0489f5cfc855954745, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loginPanel: {fileID: 175396690}
-  signupPanel: {fileID: 1893050207}
-  mainPagePanel: {fileID: 946752961}
-  forgetPasswordPanel: {fileID: 523614544}
+  pageManager: {fileID: 254827547}
+  loginPage: {fileID: 175396690}
+  createUserPage: {fileID: 1893050207}
+  mainPage: {fileID: 946752961}
+  forgotPassPage: {fileID: 523614544}
   notificationPanel: {fileID: 494092921}
   loginEmail: {fileID: 845713306}
   loginPassword: {fileID: 1390395818}
