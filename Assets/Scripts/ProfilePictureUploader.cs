@@ -1,48 +1,59 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
-using SimpleFileBrowser; // Make sure to import the namespace from your file browser plugin
+using Firebase.Storage;
 using Firebase.Auth;
+using Firebase.Extensions;
+using SimpleFileBrowser;
+using System.Threading.Tasks;
+using UnityEngine.Networking;
 
 public class ProfilePictureUploader : MonoBehaviour {
-    public RawImage profileImageDisplay; // UI element to display the profile picture
+    public RawImage profileImageDisplay;
+    private FirebaseStorage storage;
     private string userId;
-    private string filePath;
 
     void Start() {
-        // Setup File Browser (only once)
-        FileBrowser.SetFilters(true, new FileBrowser.Filter("Images", ".jpg", ".png"));
-        FileBrowser.SetDefaultFilter(".jpg");
-
-        // Get the current user's ID
-        userId = FirebaseAuth.DefaultInstance.CurrentUser?.UserId;
-        filePath = Application.persistentDataPath + "/" + userId + "_profilePic.png";
-
-        // Load the profile picture if it exists
-        LoadProfilePicture();
-
+        storage = FirebaseStorage.DefaultInstance;
+        SetUser(FirebaseAuth.DefaultInstance.CurrentUser?.UserId);
     }
 
     public void SetUser(string userId) {
-    string userFolderPath = Application.persistentDataPath + "/" + userId;
-    Directory.CreateDirectory(userFolderPath);  // Create the directory if it doesn't exist
-
-    filePath = userFolderPath + "/" + userId + "_profilePic.png";
-    LoadProfilePicture();
+        this.userId = userId;
+        if (!string.IsNullOrEmpty(userId)) {
+            LoadProfilePicture();
+        }
     }
 
-    public void LoadProfilePicture() {
-        if (File.Exists(filePath)) {
-            Texture2D texture = new Texture2D(2, 2);
-            byte[] fileData = File.ReadAllBytes(filePath);
-            texture.LoadImage(fileData);
+    private void LoadProfilePicture() {
+        if (string.IsNullOrEmpty(userId)) return;
+
+        // Construct the path where the image should be stored in Firebase Storage
+        string path = $"users/{userId}/profilePic.png";
+        StorageReference imageRef = storage.GetReference(path);
+
+        // Fetch the download URL and display the image
+        imageRef.GetDownloadUrlAsync().ContinueWithOnMainThread(task => {
+            if (!task.IsFaulted && !task.IsCanceled) {
+                StartCoroutine(DownloadImage(task.Result.ToString()));
+            } else {
+                Debug.LogError("Failed to fetch profile picture URL: " + task.Exception);
+            }
+        });
+    }
+
+    IEnumerator DownloadImage(string url) {
+        UnityWebRequest request = UnityWebRequestTexture.GetTexture(url);
+        yield return request.SendWebRequest();
+
+        if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError) {
+            Debug.LogError("Error downloading image: " + request.error);
+        } else {
+            Texture2D texture = DownloadHandlerTexture.GetContent(request);
             profileImageDisplay.texture = texture;
         }
     }
 
-    // Call this method when the user clicks the upload button
     public void OpenFileBrowser() {
         StartCoroutine(ShowLoadDialogCoroutine());
     }
@@ -51,13 +62,28 @@ public class ProfilePictureUploader : MonoBehaviour {
         yield return FileBrowser.WaitForLoadDialog(FileBrowser.PickMode.Files, false, null, null, "Load Image", "Load");
 
         if (FileBrowser.Success) {
-            string selectedFilePath = FileBrowser.Result[0];
-            File.Copy(selectedFilePath, filePath, true);
-            LoadProfilePicture();
+            UploadProfilePicture(FileBrowser.Result[0]);
         }
     }
 
-    // Add a method to clear the profile picture when user logs out
+    private void UploadProfilePicture(string localFilePath) {
+        if (string.IsNullOrEmpty(userId)) return;
+
+        // Construct the path where the image should be stored in Firebase Storage
+        string path = $"users/{userId}/profilePic.png";
+        StorageReference imageRef = storage.GetReference(path);
+
+        // Upload the file to Firebase Storage
+        imageRef.PutFileAsync(localFilePath).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted || task.IsCanceled) {
+                Debug.LogError("Profile picture upload failed: " + task.Exception);
+            } else {
+                Debug.Log("Profile picture uploaded successfully.");
+                LoadProfilePicture(); // Reload the profile picture
+            }
+        });
+    }
+
     public void ClearProfilePicture() {
         profileImageDisplay.texture = null;
     }
