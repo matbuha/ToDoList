@@ -156,8 +156,8 @@ public class FirebaseController : MonoBehaviour {
             }
 
             if (!HandleFirebaseException(task)) {
-            // If there are Firebase exceptions, they are handled and shown to the user.
-            return;
+                // If there are Firebase exceptions, they are handled and shown to the user.
+                return;
             }
 
             if (task.IsCompleted) {

@@ -8,7 +8,9 @@ using SimpleFileBrowser;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
 
+
 public class ProfilePictureUploader : MonoBehaviour {
+
     public RawImage profileImageDisplay;
     private FirebaseStorage storage;
     private string userId;

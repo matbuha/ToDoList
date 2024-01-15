@@ -148,9 +148,6 @@ public class ChecklistManager : MonoBehaviour {
             DocumentSnapshot snapshot = task.Result;
             if (snapshot.Exists) {
                 Dictionary<string, object> checklistData = snapshot.ToDictionary();
-                // Process and use the checklistData here
-                // You need to convert this data back to your ChecklistItem format
-                // and populate it in your UI or data structures.
             } else {
                 Debug.Log("No checklist data found for user: " + userId);
             }
@@ -158,7 +155,6 @@ public class ChecklistManager : MonoBehaviour {
     }
 
     public void OnCreateButtonClicked() {
-        // Assuming you have input fields for name and type, and you generate the index
         string itemName = itemNameInputField.text; // Get name from input field
         string itemType = itemTypeInputField.text; // Get type from input field
         int itemIndex = checklistObjects.Count; // Index can be the count of existing items
