@@ -8,9 +8,12 @@ using System;
 using Firebase;
 using System.Threading.Tasks;
 using Firebase.Extensions;
+using Firebase.Firestore;
 
 
 public class FirebaseController : MonoBehaviour {
+
+    FirebaseFirestore db;
 
     public PageManager pageManager; // add a reference to the PageManager script
 
@@ -42,6 +45,7 @@ public class FirebaseController : MonoBehaviour {
         if (pageManager == null) {
             pageManager = FindObjectOfType<PageManager>();
         }
+        db = FirebaseFirestore.DefaultInstance;
     }
 
 
@@ -159,13 +163,46 @@ public class FirebaseController : MonoBehaviour {
                     
                 profileUserName_Text.text = "" + newUser.User.DisplayName;
                 profileUserEmail_Text.text  = "" + newUser.User.Email;
-                OpenMainPage();
 
-                // Notify ChecklistManager about the user change
-                FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
-                FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
+                // Retrieve user data from Firestore
+                DocumentReference docRef = db.Collection("users").Document(newUser.User.UserId);
+                docRef.GetSnapshotAsync().ContinueWithOnMainThread(snapshotTask => {
+                    if (snapshotTask.IsFaulted ||!snapshotTask.Result.Exists) {
+                        Debug.LogError("Snapshot task is faulted: " + snapshotTask.Exception);
+                        if (snapshotTask.IsFaulted) {
+                        // Handle errors
+                        Debug.LogError("Snapshot task is faulted: " + snapshotTask.Exception);
+                        HandleFirebaseException(snapshotTask);
+
+                        } else {
+                            CreateNewUserDocument(newUser.User.UserId);
+                            Debug.LogError("there was no User doument, created new: " + newUser.User.UserId);
+                        }
+
+                            DocumentSnapshot snapshot = snapshotTask.Result;
+                            // Use snapshot data (e.g., checklist, profile picture) as needed
+                        // Notify ChecklistManager about the user change
+                        FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
+                        FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
+
+                        // Finally, open the MainPage
+                        OpenMainPage();
+                    }
+                });
             }
         });
+    }
+
+    private void CreateNewUserDocument(string userId) {
+        DocumentReference docRef = db.Collection("users").Document(userId);
+        Dictionary<string, object> newUserDoc = new Dictionary<string, object> {{ "initialized", true }}; // Add initial data for the new user document here
+            docRef.SetAsync(newUserDoc).ContinueWithOnMainThread(task => {
+                if (task.IsFaulted) {
+                    Debug.LogError("Error creating new user document: " + task.Exception);
+                } else {
+                    Debug.Log("New user document created successfully.");
+                }
+            });
     }
 
     void InitializeFirebase() {

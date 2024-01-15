@@ -1,54 +1,112 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Firebase;
 using Firebase.Auth;
+using Firebase.Firestore;
+using Firebase.Extensions;
+
 
 public class ChecklistManager : MonoBehaviour {
 
-    // Public variables for linking Unity objects and UI elements
-    public Transform content; // Parent transform for checklist items
-    public GameObject addPanel; // Panel for adding new checklist items
-    public Button addButton;
-    public Button createButton; // Button to create a new checklist item
-    public GameObject checklistItemPrefab; // Prefab for checklist items
+    
+    private FirebaseAuth auth;  // Declare the FirebaseAuth instance
+    private FirebaseUser user;  // Declare the FirebaseUser instance
 
+    public PageManager pageManager; // add a reference to the PageManager script
+    public Transform content;
+    public GameObject addPanel;
+    public Button addButton, createButton;
+    public GameObject checklistItemPrefab;
 
-    string filePath; // Path for saving checklist data
-
-    // A list to keep track of checklist items
     private List<ChecklistObject> checklistObjects = new List<ChecklistObject>();
-
-    // Array for storing input fields from the addPanel
     private TMP_InputField[] addInputFields;
 
+    FirebaseFirestore db;
+
+    [System.Serializable]
     public class ChecklistItem {
         public string objName;
         public string type;
         public int index;
 
-        public ChecklistItem (string name, string content, int index) {
-        objName = name;
-        type = content;
-        this.index = index;
+        // Constructor to easily create a ChecklistItem
+        public ChecklistItem(string name, string content, int index) {
+            this.objName = name;
+            this.type = content;
+            this.index = index;
+        }
+
+        // Convert ChecklistItem to a Dictionary for Firestore
+        public Dictionary<string, object> ToDictionary() {
+            Dictionary<string, object> dictionary = new Dictionary<string, object>();
+            dictionary["objName"] = objName;
+            dictionary["type"] = type;
+            dictionary["index"] = index;
+            return dictionary;
+        }
+
+        // Create a ChecklistItem from a Dictionary (retrieved from Firestore)
+        public static ChecklistItem FromDictionary(Dictionary<string, object> dictionary) {
+            string name = dictionary["objName"] as string;
+            string content = dictionary["type"] as string;
+            int index = Convert.ToInt32(dictionary["index"]);
+            return new ChecklistItem(name, content, index);
+        }
     }
 
+        // Start is called before the first frame update
+    void Start() {
+        db = FirebaseFirestore.DefaultInstance;
+        // Check and fix Firebase dependencies
+        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task => {
+            var dependencyStatus = task.Result;
+            if (dependencyStatus == DependencyStatus.Available) {
+                // Firebase and Firestore are available
+                InitializeFirebase();
+                InitializeFirestore();
+            } else {
+                Debug.LogError("Could not resolve all Firebase dependencies: " + dependencyStatus);
+                // Handle the unavailability of Firebase and Firestore
+            }
+        });
+
+        // Optionally, get the PageManager if it's not set
+        if (pageManager == null) {
+            pageManager = FindObjectOfType<PageManager>();
+        }
     }
 
-    // Start is called before the first frame update
-    private void Start() {
-        // Set the file path for saving checklist data
-        var userId = FirebaseAuth.DefaultInstance.CurrentUser?.UserId;
-        filePath = Application.persistentDataPath + "/" + userId + "_checklist.txt";
-        LoadJSONData();
+    void InitializeFirebase() {
+        Debug.Log("Setting up Firebase Auth");
+        auth = FirebaseAuth.DefaultInstance;
+        auth.StateChanged += AuthStateChanged;
+        AuthStateChanged(this, null);
+    }
 
-        // Get all InputField components from addPanel
-        addInputFields = addPanel.GetComponentsInChildren<TMP_InputField>();
-        
-        createButton.onClick.AddListener(delegate {CreateChecklistItem(addInputFields[0].text, addInputFields[1].text); });
-        
+    void InitializeFirestore() {
+        Debug.Log("Setting up Firestore");
+        FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+        // Further Firestore initializations (if required)
+    }
+
+    void AuthStateChanged(object sender, EventArgs eventArgs) {
+        if (auth.CurrentUser != user) {
+            bool signedIn = user != auth.CurrentUser && auth.CurrentUser != null && auth.CurrentUser.IsValid();
+            if (!signedIn && user != null) {
+                Debug.Log("Signed out " + user.UserId);
+                // Perform actions needed after user signs out
+            }
+            user = auth.CurrentUser;
+            if (signedIn) {
+                Debug.Log("Signed in " + user.UserId);
+                // Perform actions needed after user signs in
+            }
+        }
     }
 
     // Method to switch between different UI modes
@@ -69,41 +127,80 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
-    // Method to create a new checklist item
-    void CreateChecklistItem(string name, string type, int loadIndex = 0, bool loading = false) {
-        // Create a new checklist item from the prefab
-        GameObject item = Instantiate(checklistItemPrefab);
-
-        // Set the parent of the new item to 'content'
-        item.transform.SetParent(content);
-
-        // Get the ChecklistObject component of the new item
-        ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
-
-        // Determine the index for the new item
-
-        int index = loadIndex;
-        if (!loading) {
-            index = checklistObjects.Count;
+    public void LoadChecklistData() {
+        // Ensure there's a logged-in user
+        if (auth.CurrentUser == null) {
+            Debug.LogError("No user logged in.");
+            return;
         }
-            
-        // Set the details of the new checklist item
-        itemObject.SetObjectInfo(name, type, index);
 
-        // Add the new item to the list of checklist items
-        checklistObjects.Add(itemObject);
+        string userId = auth.CurrentUser.UserId;
+        CollectionReference checklistCollection = db.Collection("checklists");
 
-        // Temporarily store the itemObject
-        ChecklistObject temp = itemObject;
+        checklistCollection.Document(userId).GetSnapshotAsync().ContinueWithOnMainThread(task => {
+            if (task.IsFaulted || task.IsCanceled) {
+                Debug.LogError("Error fetching checklist data: " + task.Exception);
+                return;
+            }
 
-        // Add a listener to handle changes in the checklist item's toggle state
-        itemObject.GetComponent<Toggle>().onValueChanged.AddListener(delegate {CheckItem(temp); });
+            DocumentSnapshot snapshot = task.Result;
+            if (snapshot.Exists) {
+                Dictionary<string, object> checklistData = snapshot.ToDictionary();
+                // Process and use the checklistData here
+                // You need to convert this data back to your ChecklistItem format
+                // and populate it in your UI or data structures.
+            } else {
+                Debug.Log("No checklist data found for user: " + userId);
+            }
+        });
+    }
 
+        // Method to create a new checklist item
+    public void CreateChecklistItem(string name, string type, int loadIndex = 0, bool loading = false) {
         if (!loading) {
-            SaveJSONData();
-            // Switch back to the regular checklist view
-            SwitchMode(0);
+            // Create a new checklist item locally
+            GameObject item = Instantiate(checklistItemPrefab);
+            item.transform.SetParent(content);
+            ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
+            int index = checklistObjects.Count;
+            itemObject.SetObjectInfo(name, type, index);
+            checklistObjects.Add(itemObject);
+
+            // Add the new item to the checklist in Firestore
+            SaveChecklistItemToFirestore(new ChecklistItem(name, type, index));
+        } else {
+            // This branch is for loading existing items from Firestore
+            // Create the checklist item from loaded data
+            GameObject item = Instantiate(checklistItemPrefab);
+            item.transform.SetParent(content);
+            ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
+            itemObject.SetObjectInfo(name, type, loadIndex);
+            checklistObjects.Add(itemObject);
         }
+    }
+
+    public void SaveChecklistItemToFirestore(ChecklistItem checklistItem) {
+        if (auth.CurrentUser == null) {
+            Debug.LogError("No user logged in. Cannot save checklist item.");
+            return;
+        }
+
+        string userId = auth.CurrentUser.UserId;
+        DocumentReference docRef = db.Collection("checklists").Document(userId);
+
+        Dictionary<string, object> data = new Dictionary<string, object> {
+            { "name", checklistItem.objName },
+            { "type", checklistItem.type },
+            { "index", checklistItem.index }
+        };
+
+        docRef.SetAsync(data, SetOptions.MergeAll).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted) {
+                Debug.LogError("Error saving data: " + task.Exception);
+            } else {
+                Debug.Log("Checklist item saved successfully.");
+            }
+        });
     }
 
     IEnumerator DestroyAfterDelay(GameObject item, float delay) {
@@ -120,38 +217,91 @@ public class ChecklistManager : MonoBehaviour {
     void CheckItem(ChecklistObject item) {
         // Remove the item from the list of checklist items
         checklistObjects.Remove(item);
-        SaveJSONData();
+
+        // Update the Firestore database
+        UpdateChecklistDataInFirestore();
+
+        // Start coroutine to destroy the item after a delay
         StartCoroutine(DestroyAfterDelay(item.gameObject, timeToDestroy));
     }
 
-    void SaveJSONData() {
-        string contents = "";
+    void UpdateChecklistDataInFirestore() {
+        FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+        DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
 
-        for (int i = 0; i < checklistObjects.Count; i++) {
-            ChecklistItem temp = new ChecklistItem(checklistObjects[i].objName, checklistObjects[i].type, checklistObjects[i].index);
-            contents += JsonUtility.ToJson(temp) + "\n";
+        // Prepare the data to be saved
+        Dictionary<string, object> data = new Dictionary<string, object>();
+        List<Dictionary<string, object>> itemsData = new List<Dictionary<string, object>>();
+        foreach (var checklistItem in checklistObjects) {
+            itemsData.Add(new Dictionary<string, object>{
+                { "name", checklistItem.objName },
+                { "type", checklistItem.type },
+                { "index", checklistItem.index }
+            });
         }
+        data["items"] = itemsData;
 
-        File.WriteAllText(filePath, contents);
+        // Update the Firestore document
+        docRef.SetAsync(data).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted) {
+                Debug.LogError("Error updating Firestore: " + task.Exception);
+            } else {
+                Debug.Log("Checklist data updated successfully.");
+            }
+        });
     }
 
-    void LoadJSONData () {
-        if (File.Exists(filePath)) {
-            string contents = File.ReadAllText(filePath);
-            string[] splitContents = contents.Split('\n');
+    void SaveChecklistDataToFirestore() {
+        FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+        DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
 
-            foreach (string content in splitContents) {
-                if (content.Trim() != "") {
-                    ChecklistItem temp = JsonUtility.FromJson<ChecklistItem>(content);
-                    CreateChecklistItem(temp.objName, temp.type, temp.index, true);
-                }
-                
-            }
-            
-        }else{
-            Debug.Log("No file for user. This might be the first login.");
+        // Prepare the data to be saved
+        Dictionary<string, object> data = new Dictionary<string, object>();
+        List<Dictionary<string, object>> itemsData = new List<Dictionary<string, object>>();
+        foreach (var checklistItem in checklistObjects) {
+            itemsData.Add(new Dictionary<string, object>{
+                { "name", checklistItem.objName },
+                { "type", checklistItem.type },
+                { "index", checklistItem.index }
+            });
         }
-        
+        data["items"] = itemsData;
+
+        // Update the Firestore document
+        docRef.SetAsync(data).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted) {
+                Debug.LogError("Error updating Firestore: " + task.Exception);
+            } else {
+                Debug.Log("Checklist data saved successfully to Firestore.");
+            }
+        });
+    }
+
+    void LoadChecklistDataFromFirestore() {
+        FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+        DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
+
+        docRef.GetSnapshotAsync().ContinueWithOnMainThread(task => {
+            if (task.IsFaulted || !task.Result.Exists) {
+                Debug.LogWarning("Error fetching Firestore document or document does not exist: " + task.Exception);
+                return;
+            }
+
+            DocumentSnapshot snapshot = task.Result;
+            Dictionary<string, object> data = snapshot.ToDictionary();
+
+            if (data.TryGetValue("items", out object itemsObj) && itemsObj is List<object> itemsList) {
+                foreach (object itemObj in itemsList) {
+                    if (itemObj is Dictionary<string, object> itemDict) {
+                        string name = itemDict.TryGetValue("name", out object nameObj) ? nameObj.ToString() : "";
+                        string type = itemDict.TryGetValue("type", out object typeObj) ? typeObj.ToString() : "";
+                        int index = itemDict.TryGetValue("index", out object indexObj) && int.TryParse(indexObj.ToString(), out int idx) ? idx : 0;
+                        // Create the checklist item in the UI
+                    CreateChecklistItem(name, type, index, true);
+                }
+            }
+        }
+    });
     }
 
     public void ClearUI() {
@@ -161,11 +311,19 @@ public class ChecklistManager : MonoBehaviour {
     }
 
     public void SetUser(string userId) {
-        string userFolderPath = Application.persistentDataPath + "/" + userId;
-        Directory.CreateDirectory(userFolderPath);  // Create the directory if it doesn't exist
+        // Clear existing tasks
+        checklistObjects.Clear();
 
-        filePath = userFolderPath + "/" + userId + "_checklist.txt";
-        LoadJSONData();
+        // Clear UI
+        ClearUI();
+
+        // Update the FirebaseUser and Firestore references
+        user = FirebaseAuth.DefaultInstance.CurrentUser;
+        if (user != null && user.UserId == userId) {
+            LoadChecklistDataFromFirestore();
+        } else {
+            Debug.LogError("User mismatch or null user. Cannot load data for the given userId.");
+        }
     }
 
     public void ClearUserData() {
