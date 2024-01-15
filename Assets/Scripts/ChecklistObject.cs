@@ -22,8 +22,8 @@ public class ChecklistObject : MonoBehaviour {
         UpdateItemText();
     }
 
-    public void SetObjectInfo(string name, string content, int index) {
-        objName = name;
+    public void SetObjectInfo(string titleTxt, string content, int index) {
+        objName = titleTxt;
         type = content;
         this.index = index;
 
@@ -36,4 +36,17 @@ public class ChecklistObject : MonoBehaviour {
             contentText.text = type; // Set the content
         }
     }
+
+    public void OnToggleChanged(bool isOn) {
+    if (isOn) {
+        ChecklistManager checklistManager = FindObjectOfType<ChecklistManager>();
+        if (checklistManager != null) {
+            Debug.Log("OnToggleChanged worked");
+            checklistManager.CheckItem(this); // 'this' refers to the current ChecklistObject instance
+        } else {
+            Debug.LogError("ChecklistManager not found in the scene.");
+        }
+    }
+}
+
 }

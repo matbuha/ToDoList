@@ -151,43 +151,43 @@ public class FirebaseController : MonoBehaviour {
         auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled) {
                 Debug.LogError("SignInWithEmailAndPasswordAsync was canceled.");
+                ShowErrorMessage("Login was canceled.");
                 return;
             }
 
-            HandleFirebaseException(task);
+            if (!HandleFirebaseException(task)) {
+            // If there are Firebase exceptions, they are handled and shown to the user.
+            return;
+            }
 
             if (task.IsCompleted) {
                 AuthResult newUser = task.Result;
                 Debug.LogFormat("User signed in successfully: {0} ({1})",
                     newUser.User.DisplayName, newUser.User.UserId);
-                    
+
                 profileUserName_Text.text = "" + newUser.User.DisplayName;
                 profileUserEmail_Text.text  = "" + newUser.User.Email;
 
                 // Retrieve user data from Firestore
                 DocumentReference docRef = db.Collection("users").Document(newUser.User.UserId);
                 docRef.GetSnapshotAsync().ContinueWithOnMainThread(snapshotTask => {
-                    if (snapshotTask.IsFaulted ||!snapshotTask.Result.Exists) {
+                    if (snapshotTask.IsFaulted) {
                         Debug.LogError("Snapshot task is faulted: " + snapshotTask.Exception);
-                        if (snapshotTask.IsFaulted) {
-                        // Handle errors
-                        Debug.LogError("Snapshot task is faulted: " + snapshotTask.Exception);
-                        HandleFirebaseException(snapshotTask);
-
-                        } else {
-                            CreateNewUserDocument(newUser.User.UserId);
-                            Debug.LogError("there was no User doument, created new: " + newUser.User.UserId);
-                        }
-
-                            DocumentSnapshot snapshot = snapshotTask.Result;
-                            // Use snapshot data (e.g., checklist, profile picture) as needed
-                        // Notify ChecklistManager about the user change
-                        FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
-                        FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
-
-                        // Finally, open the MainPage
-                        OpenMainPage();
+                        ShowErrorMessage("Error retrieving user data.");
+                    } else if (!snapshotTask.Result.Exists) {
+                        // Document does not exist, so create it
+                        CreateNewUserDocument(newUser.User.UserId);
+                    } else {
+                        DocumentSnapshot snapshot = snapshotTask.Result;
+                        // Use snapshot data (e.g., checklist, profile picture) as needed
                     }
+
+                    // Notify ChecklistManager about the user change
+                    FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
+                    FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
+
+                    // Finally, open the MainPage
+                    OpenMainPage();
                 });
             }
         });
@@ -269,17 +269,32 @@ public class FirebaseController : MonoBehaviour {
         }
     }
 
-    private void HandleFirebaseException(Task task) {
+    private bool HandleFirebaseException(Task task) {
         if (task.IsFaulted) {
             foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
                 FirebaseException firebaseEx = exception as FirebaseException;
                 if (firebaseEx != null) {
                     var errorCode = (AuthError)firebaseEx.ErrorCode;
-                    showNotifactionMessage("Error", GetErrorMessage(errorCode));
+                    string message = GetErrorMessage(errorCode);
+                    ShowErrorMessage(message);
+                    return false;
                 }
             }
         }
+        return true;
     }
+
+
+    private void ShowErrorMessage(string message) {
+        // Update this method to display the error message in your UI.
+        // For example, using a text element or a popup.
+        Debug.LogError(message); // Log the error for debugging.
+
+        // Assuming you have a UI text element and a panel for showing errors:
+        errorMessage.text = message; // Update the text element with the error message.
+        notificationPanel.SetActive(true); // Show the panel or popup.
+    }
+
 
     private static string GetErrorMessage(AuthError errorCode) {
         var message = "";
