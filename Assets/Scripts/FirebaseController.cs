@@ -116,7 +116,13 @@ public class FirebaseController : MonoBehaviour {
 
         // Reset ChecklistManager
         FindObjectOfType<ChecklistManager>()?.ClearUserData();
-        FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
+        
+            // Find the ProfilePictureUploader instance and clear the profile picture
+        var profilePictureUploader = FindObjectOfType<ProfilePictureUploader>();
+        if (profilePictureUploader != null) {
+            profilePictureUploader.ClearProfilePicture();
+            profilePictureUploader.StopListeningForUserUpdates(); // Stop listening for user updates
+        }
         OpenLoginPage();
     }
 

@@ -1,9 +1,12 @@
 using System.Collections;
+using System.IO;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Firebase.Storage;
 using Firebase.Auth;
 using Firebase.Extensions;
+using Firebase.Firestore;
 using SimpleFileBrowser;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
@@ -14,6 +17,7 @@ public class ProfilePictureUploader : MonoBehaviour {
     public RawImage profileImageDisplay;
     private FirebaseStorage storage;
     private string userId;
+    private ListenerRegistration userListenerRegistration;
 
     void Start() {
         storage = FirebaseStorage.DefaultInstance;
@@ -24,6 +28,27 @@ public class ProfilePictureUploader : MonoBehaviour {
         this.userId = userId;
         if (!string.IsNullOrEmpty(userId)) {
             LoadProfilePicture();
+            StartListeningForUserUpdates(); // Start listening for updates
+        }
+    }
+
+    void StartListeningForUserUpdates() {
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var userDocRef = FirebaseFirestore.DefaultInstance.Collection("users").Document(userId);
+        userListenerRegistration = userDocRef.Listen(snapshot => {
+            if (snapshot.Exists) {
+                Debug.Log("User data updated.");
+                LoadProfilePicture(); // Reload the profile picture
+                // Add other data reloading logic here if necessary
+            }
+        });
+    }
+
+    public void StopListeningForUserUpdates() {
+        if (userListenerRegistration != null) {
+            userListenerRegistration.Stop();
+            userListenerRegistration = null;
         }
     }
 
@@ -68,14 +93,21 @@ public class ProfilePictureUploader : MonoBehaviour {
         }
     }
 
-    private void UploadProfilePicture(string localFilePath) {
+    private void UploadProfilePicture(string selectedFilePath) {
         if (string.IsNullOrEmpty(userId)) return;
 
-        // Construct the path where the image should be stored in Firebase Storage
+        // Get a valid file path in the local app directory
+        string localFilePath = Path.Combine(Application.persistentDataPath, Path.GetFileName(selectedFilePath));
+        try {
+            File.Copy(selectedFilePath, localFilePath, true);
+        } catch (Exception ex) {
+            Debug.LogError("Error copying file: " + ex.Message);
+            return;
+        }
+
         string path = $"users/{userId}/profilePic.png";
         StorageReference imageRef = storage.GetReference(path);
 
-        // Upload the file to Firebase Storage
         imageRef.PutFileAsync(localFilePath).ContinueWithOnMainThread(task => {
             if (task.IsFaulted || task.IsCanceled) {
                 Debug.LogError("Profile picture upload failed: " + task.Exception);
@@ -85,6 +117,7 @@ public class ProfilePictureUploader : MonoBehaviour {
             }
         });
     }
+
 
     public void ClearProfilePicture() {
         profileImageDisplay.texture = null;
