@@ -52,7 +52,7 @@ public class ProfilePictureUploader : MonoBehaviour {
         }
     }
 
-    private void LoadProfilePicture() {
+    public void LoadProfilePicture() {
         if (string.IsNullOrEmpty(userId)) return;
 
         // Construct the path where the image should be stored in Firebase Storage

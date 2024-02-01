@@ -371,4 +371,16 @@ public class FirebaseController : MonoBehaviour {
             }
         }
     }
+
+    public void OnRefreshButtonClicked() {
+        var checklistManager = FindObjectOfType<ChecklistManager>();
+        if (checklistManager != null) {
+            checklistManager.LoadChecklistDataFromFirestore(); // Refresh checklist data
+        }
+
+        var profilePictureUploader = FindObjectOfType<ProfilePictureUploader>();
+        if (profilePictureUploader != null) {
+            profilePictureUploader.LoadProfilePicture(); // Refresh profile picture
+        }
+    }
 }

@@ -272,7 +272,8 @@ public class ChecklistManager : MonoBehaviour {
         });
     }
 
-    void LoadChecklistDataFromFirestore() {
+    public void LoadChecklistDataFromFirestore() {
+        ClearUI(); // Clear existing data
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
         DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
 
@@ -300,6 +301,7 @@ public class ChecklistManager : MonoBehaviour {
     }
 
     public void ClearUI() {
+        checklistObjects.Clear();
         foreach (Transform child in content) {
             Destroy(child.gameObject);
         }
