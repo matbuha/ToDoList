@@ -10,123 +10,126 @@ using System.Threading.Tasks;
 using Firebase.Extensions;
 using Firebase.Firestore;
 
-
 public class FirebaseController : MonoBehaviour {
-
+    // Reference to Firestore database
     FirebaseFirestore db;
 
-    public PageManager pageManager; // add a reference to the PageManager script
+    // Reference to PageManager script for UI navigation
+    public PageManager pageManager;
 
+    // Current Firebase user
     private FirebaseUser user;
+
+    // Firebase Authentication instance
     private FirebaseAuth auth;
+
+    // UI elements for various pages and input fields
     public GameObject loginPage, createUserPage, mainPage, forgotPassPage, notificationPanel;
     public TMP_InputField loginEmail, loginPassword, signupEmail, signupPassword,signupConfirmPassword, signupUserName,forgetPassEmail;
     public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text;
+
+    // Flag to check if a user is signed in
     bool isSignIn = false;
 
-
-
     void Start() {
+        // Check and fix Firebase dependencies at the start
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task => {
             var dependencyStatus = task.Result;
             if (dependencyStatus == DependencyStatus.Available) {
-                    // Create and hold a reference to your FirebaseApp,
-                    // where app is a Firebase.FirebaseApp property of your application class.
-                    InitializeFirebase();
-
-                    // Set a flag here to indicate whether Firebase is ready to use by your app.
+                // Firebase is ready to use
+                InitializeFirebase();
             } else {
-                    Debug.LogError(string.Format(
-                    "Could not resolve all Firebase dependencies: {0}", dependencyStatus));
-                    // Firebase Unity SDK is not safe to use here.
+                // Handle dependency resolution failure
+                Debug.LogError(string.Format("Could not resolve all Firebase dependencies: {0}", dependencyStatus));
             }
         });
 
+        // Initialize Firestore database reference
         if (pageManager == null) {
             pageManager = FindObjectOfType<PageManager>();
         }
         db = FirebaseFirestore.DefaultInstance;
     }
 
-
-    public void OpenLoginPage () {
+    // Navigation methods to open different pages
+    public void OpenLoginPage() {
         pageManager.ShowPage("LoginPage");
     }
 
-    public void OpenMainPage () {
+    public void OpenMainPage() {
         pageManager.ShowPage("MainPage");
     }
 
+    // Method to log in the user with email and password
     public void LogInUser() {
-        if (string.IsNullOrEmpty(loginEmail.text)&&string.IsNullOrEmpty(loginPassword.text)) {
-
+        if (string.IsNullOrEmpty(loginEmail.text) && string.IsNullOrEmpty(loginPassword.text)) {
+            // Show error if fields are empty
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
-            return;
-        }else{
+        } else {
+            // Attempt to sign in the user
             SignInUser(loginEmail.text, loginPassword.text);
         }
     }
 
+    // Method to sign up a new user
     public void SignUpUser() {
-        if (string.IsNullOrEmpty(signupEmail.text)&&string.IsNullOrEmpty(signupPassword.text)
-        &&string.IsNullOrEmpty(signupConfirmPassword.text)&&string.IsNullOrEmpty(signupUserName.text)) {
-
+        if (string.IsNullOrEmpty(signupEmail.text) && string.IsNullOrEmpty(signupPassword.text)
+            && string.IsNullOrEmpty(signupConfirmPassword.text) && string.IsNullOrEmpty(signupUserName.text)) {
+            // Show error if fields are empty
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
-            return;
-        }else{
+        } else {
+            // Attempt to create a new user
             CreateUser(signupEmail.text, signupPassword.text, signupUserName.text);
         }
     }
 
+    // Method for password reset
     public void forgetPass() {
         if (string.IsNullOrEmpty(forgetPassEmail.text)) {
-
+            // Show error if field is empty
             showNotifactionMessage("Error", "Please Fill All Necessary Fields");
-            return;
-        }else{
+        } else {
+            // Attempt to send a password reset email
             forgetPasswordSubmit(forgetPassEmail.text);
         }
     }
 
+    // Show a notification message
     private void showNotifactionMessage(string title, string message) {
-        errorTitleText.text = "" + title;
-        errorMessage.text = "" + message;
-
+        errorTitleText.text = title;
+        errorMessage.text = message;
         notificationPanel.SetActive(true);
     }
 
+    // Close the notification panel
     public void closeNotifactionMessage() {
         errorTitleText.text = "";
         errorMessage.text = "";
-
         notificationPanel.SetActive(false);
     }
 
+    // Method to log out the current user
     public void Logout() {
         auth.SignOut();
         profileUserEmail_Text.text = "";
         profileUserName_Text.text = "";
 
-        // Find the ChecklistManager instance and call the clear methods
+        // Clear UI and data for checklist and profile picture
         var checklistManager = FindObjectOfType<ChecklistManager>();
         if (checklistManager != null) {
-            checklistManager.ClearUI();        // Clear the UI elements
-            checklistManager.ClearUserData();  // Clear the data
+            checklistManager.ClearUI();
+            checklistManager.ClearUserData();
         }
 
-        // Reset ChecklistManager
-        FindObjectOfType<ChecklistManager>()?.ClearUserData();
-        
-            // Find the ProfilePictureUploader instance and clear the profile picture
         var profilePictureUploader = FindObjectOfType<ProfilePictureUploader>();
         if (profilePictureUploader != null) {
             profilePictureUploader.ClearProfilePicture();
-            profilePictureUploader.StopListeningForUserUpdates(); // Stop listening for user updates
+            // profilePictureUploader.StopListeningForUserUpdates();
         }
         OpenLoginPage();
     }
 
-
+    // Method to create a new user with email and password
     void CreateUser(string email, string password, string UserName) {
         auth.CreateUserWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled) {
@@ -137,22 +140,20 @@ public class FirebaseController : MonoBehaviour {
             HandleFirebaseException(task);
             
             if (task.IsCompleted) {
-                // Firebase user has been created.
+                // Successfully created Firebase user
                 AuthResult result = task.Result;
-                Debug.LogFormat("Firebase user created successfully: {0} ({1})",
-                    result.User.DisplayName, result.User.UserId);
-
+                Debug.LogFormat("Firebase user created successfully: {0} ({1})", result.User.DisplayName, result.User.UserId);
                 UpdateUserProfile(UserName);
-                OpenLoginPage ();
+                OpenLoginPage();
             }
         });
     }
 
-    void SignInUser (string email, string password) {
-        // Before setting the new user, clear existing data
+    // Method to sign in an existing user
+    void SignInUser(string email, string password) {
+        // Clear existing profile picture and checklist data before signing in
         FindObjectOfType<ProfilePictureUploader>()?.ClearProfilePicture();
         FindObjectOfType<ChecklistManager>()?.ClearUserData();
-
 
         auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWithOnMainThread(task => {
             if (task.IsCanceled) {
@@ -162,55 +163,58 @@ public class FirebaseController : MonoBehaviour {
             }
 
             if (!HandleFirebaseException(task)) {
-                // If there are Firebase exceptions, they are handled and shown to the user.
+                // Handle any Firebase exceptions
                 return;
             }
 
             if (task.IsCompleted) {
+                // Successfully signed in
                 AuthResult newUser = task.Result;
-                Debug.LogFormat("User signed in successfully: {0} ({1})",
-                    newUser.User.DisplayName, newUser.User.UserId);
+                Debug.LogFormat("User signed in successfully: {0} ({1})", newUser.User.DisplayName, newUser.User.UserId);
+                profileUserName_Text.text = newUser.User.DisplayName;
+                profileUserEmail_Text.text = newUser.User.Email;
 
-                profileUserName_Text.text = "" + newUser.User.DisplayName;
-                profileUserEmail_Text.text  = "" + newUser.User.Email;
-
-                // Retrieve user data from Firestore
+                // Retrieve and use user data from Firestore
                 DocumentReference docRef = db.Collection("users").Document(newUser.User.UserId);
                 docRef.GetSnapshotAsync().ContinueWithOnMainThread(snapshotTask => {
                     if (snapshotTask.IsFaulted) {
                         Debug.LogError("Snapshot task is faulted: " + snapshotTask.Exception);
                         ShowErrorMessage("Error retrieving user data.");
-                    } else if (!snapshotTask.Result.Exists) {
-                        // Document does not exist, so create it
-                        CreateNewUserDocument(newUser.User.UserId);
-                    } else {
-                        DocumentSnapshot snapshot = snapshotTask.Result;
-                        // Use snapshot data (e.g., checklist, profile picture) as needed
+                        return;
                     }
 
-                    // Notify ChecklistManager about the user change
+                    if (!snapshotTask.Result.Exists) {
+                        // Create a new document for the user if it doesn't exist
+                        CreateNewUserDocument(newUser.User.UserId);
+                    } else {
+                        // Use user data from the snapshot
+                        DocumentSnapshot snapshot = snapshotTask.Result;
+                    }
+
+                    // Notify ChecklistManager and ProfilePictureUploader about the user change
                     FindObjectOfType<ChecklistManager>()?.SetUser(newUser.User.UserId);
                     FindObjectOfType<ProfilePictureUploader>()?.SetUser(newUser.User.UserId);
 
-                    // Finally, open the MainPage
-                    OpenMainPage();
+                    OpenMainPage(); // Navigate to the main page
                 });
             }
         });
     }
 
+    // Create a new Firestore document for the new user
     private void CreateNewUserDocument(string userId) {
         DocumentReference docRef = db.Collection("users").Document(userId);
-        Dictionary<string, object> newUserDoc = new Dictionary<string, object> {{ "initialized", true }}; // Add initial data for the new user document here
-            docRef.SetAsync(newUserDoc).ContinueWithOnMainThread(task => {
-                if (task.IsFaulted) {
-                    Debug.LogError("Error creating new user document: " + task.Exception);
-                } else {
-                    Debug.Log("New user document created successfully.");
-                }
-            });
+        Dictionary<string, object> newUserDoc = new Dictionary<string, object> { { "initialized", true } };
+        docRef.SetAsync(newUserDoc).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted) {
+                Debug.LogError("Error creating new user document: " + task.Exception);
+            } else {
+                Debug.Log("New user document created successfully.");
+            }
+        });
     }
 
+    // Initialize Firebase Authentication and set up the state changed listener
     void InitializeFirebase() {
         Debug.Log("Setting up Firebase Auth");
         auth = FirebaseAuth.DefaultInstance;
@@ -218,10 +222,10 @@ public class FirebaseController : MonoBehaviour {
         AuthStateChanged(this, null);
     }
 
+    // Handle Firebase Authentication state changes
     void AuthStateChanged(object sender, EventArgs eventArgs) {
         if (auth.CurrentUser != user) {
-            bool signedIn = user != auth.CurrentUser && auth.CurrentUser != null
-                && auth.CurrentUser.IsValid();
+            bool signedIn = user != auth.CurrentUser && auth.CurrentUser != null && auth.CurrentUser.IsValid();
             if (!signedIn && user != null) {
                 Debug.Log("Signed out " + user.UserId);
             }
@@ -233,11 +237,13 @@ public class FirebaseController : MonoBehaviour {
         }
     }
 
+    // Clean up the auth state changed listener when the object is destroyed
     void OnDestroy() {
         auth.StateChanged -= AuthStateChanged;
         auth = null;
     }
 
+    // Update the user's profile with a display name and a placeholder photo URL
     void UpdateUserProfile(string UserName) {
         FirebaseUser user = auth.CurrentUser;
         if (user != null) {
@@ -256,7 +262,6 @@ public class FirebaseController : MonoBehaviour {
                 }
 
                 Debug.Log("User profile updated successfully.");
-
                 showNotifactionMessage("Alert", "Account Successfully Created");
             });
         }
@@ -264,17 +269,19 @@ public class FirebaseController : MonoBehaviour {
 
     bool isSigned = false;
 
+    // Method to show the main page if the user is signed in
     void Update() {
         if (isSignIn) {
-            if (isSigned) {
+            if (!isSigned) {
                 isSigned = true;
-                profileUserName_Text.text = "" + user.DisplayName;
-                profileUserEmail_Text.text  = "" + user.Email;
+                profileUserName_Text.text = user.DisplayName;
+                profileUserEmail_Text.text = user.Email;
                 OpenMainPage();
             }
         }
     }
 
+    // Handle Firebase exceptions and show appropriate error messages
     private bool HandleFirebaseException(Task task) {
         if (task.IsFaulted) {
             foreach (Exception exception in task.Exception.Flatten().InnerExceptions) {
@@ -290,22 +297,17 @@ public class FirebaseController : MonoBehaviour {
         return true;
     }
 
-
+    // Show error messages based on Firebase authentication error codes
     private void ShowErrorMessage(string message) {
-        // Update this method to display the error message in your UI.
-        // For example, using a text element or a popup.
-        Debug.LogError(message); // Log the error for debugging.
-
-        // Assuming you have a UI text element and a panel for showing errors:
-        errorMessage.text = message; // Update the text element with the error message.
-        notificationPanel.SetActive(true); // Show the panel or popup.
+        Debug.LogError(message);
+        errorMessage.text = message;
+        notificationPanel.SetActive(true);
     }
 
-
     private static string GetErrorMessage(AuthError errorCode) {
+        // Map AuthError codes to error messages
         var message = "";
-        switch (errorCode)
-        {
+        switch (errorCode) {
             case AuthError.AccountExistsWithDifferentCredentials:
                 message = "The account already exists with different credentials";
                 break;
@@ -334,20 +336,23 @@ public class FirebaseController : MonoBehaviour {
         return message;
     }
 
+    // Method to send a password reset email
     void forgetPasswordSubmit(string forgetPasswordEmail) {
-        auth.SendPasswordResetEmailAsync(forgetPasswordEmail).ContinueWithOnMainThread(task=>{
-            if(task.IsCanceled) {
-                Debug.LogError("SendPasswordResetEmailAsyn was canceled");
+        auth.SendPasswordResetEmailAsync(forgetPassEmail.text).ContinueWithOnMainThread(task => {
+            if (task.IsCanceled) {
+                Debug.LogError("SendPasswordResetEmailAsync was canceled.");
+                return;
             }
-            
+
             HandleFirebaseException(task);
-            
+
             if (task.IsCompleted) {
                 showNotifactionMessage("Alert", "Check Your Email For Further Instructions");
             }
         });
     }
 
+    // Save user credentials locally on Android using a custom SharedPreferencesManager class
     public void SaveCredentials(string email, string password) {
         if (Application.platform == RuntimePlatform.Android) {
             using (var javaClass = new AndroidJavaClass("com.yourcompany.plugin.SharedPreferencesManager")) {
@@ -359,6 +364,7 @@ public class FirebaseController : MonoBehaviour {
         }
     }
 
+    // Load saved user credentials on Android using the custom SharedPreferencesManager class
     public void LoadCredentials() {
         if (Application.platform == RuntimePlatform.Android) {
             string email = "", password = "";
@@ -372,6 +378,7 @@ public class FirebaseController : MonoBehaviour {
         }
     }
 
+    // Method triggered by the refresh button click to update user data and profile picture
     public void OnRefreshButtonClicked() {
         var checklistManager = FindObjectOfType<ChecklistManager>();
         if (checklistManager != null) {

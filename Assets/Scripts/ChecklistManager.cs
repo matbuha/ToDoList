@@ -10,40 +10,39 @@ using Firebase.Auth;
 using Firebase.Firestore;
 using Firebase.Extensions;
 
-
+// Manages checklist items within the app, including creating, displaying, and deleting them
 public class ChecklistManager : MonoBehaviour {
 
     
-    private FirebaseAuth auth;  // Declare the FirebaseAuth instance
-    private FirebaseUser user;  // Declare the FirebaseUser instance
+    private FirebaseAuth auth; // Firebase Authentication instance for user management
+    private FirebaseUser user; // Represents the current Firebase user
 
-    public PageManager pageManager; // add a reference to the PageManager script
-    public Transform content;
-    public GameObject addPanel;
-    public Button addButton, createButton;
-    public GameObject checklistItemPrefab;
+    public PageManager pageManager; // Reference to manage navigation between different UI pages
+    public Transform content; // Parent transform for dynamically created checklist items
+    public GameObject addPanel; // UI panel for adding new checklist items
+    public Button addButton, createButton; // Buttons for adding items and creating new items
+    public GameObject checklistItemPrefab; // Prefab for instantiating new checklist items
 
-    private List<ChecklistObject> checklistObjects = new List<ChecklistObject>();
-    private TMP_InputField[] addInputFields;
-    public TMP_InputField itemNameInputField; // Drag your item name input field here in the Unity Editor
-    public TMP_InputField itemTypeInputField; // Drag your item type input field here in the Unity Editor
+    private List<ChecklistObject> checklistObjects = new List<ChecklistObject>(); // List to keep track of all checklist items
+    public TMP_InputField itemNameInputField, itemTypeInputField; // Input fields for item name and type
 
-    FirebaseFirestore db;
+    FirebaseFirestore db; // Firestore database instance
 
-    [System.Serializable]
+    // Represents a single checklist item
+    [Serializable]
     public class ChecklistItem {
         public string objName;
         public string type;
         public int index;
 
-        // Constructor to easily create a ChecklistItem
+        // Constructor to initialize a new checklist item
         public ChecklistItem(string name, string content, int index) {
             this.objName = name;
             this.type = content;
             this.index = index;
         }
 
-        // Convert ChecklistItem to a Dictionary for Firestore
+        // Converts the checklist item to a dictionary for Firestore storage
         public Dictionary<string, object> ToDictionary() {
             Dictionary<string, object> dictionary = new Dictionary<string, object>();
             dictionary["objName"] = objName;
@@ -52,7 +51,7 @@ public class ChecklistManager : MonoBehaviour {
             return dictionary;
         }
 
-        // Create a ChecklistItem from a Dictionary (retrieved from Firestore)
+        // Creates a ChecklistItem instance from a Firestore document
         public static ChecklistItem FromDictionary(Dictionary<string, object> dictionary) {
             string name = dictionary["objName"] as string;
             string content = dictionary["type"] as string;
@@ -61,7 +60,7 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
-        // Start is called before the first frame update
+    // Initialize Firestore and Firebase on start
     void Start() {
         db = FirebaseFirestore.DefaultInstance;
         // Check and fix Firebase dependencies
@@ -83,6 +82,7 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
+    // Sets up Firebase Authentication
     void InitializeFirebase() {
         Debug.Log("Setting up Firebase Auth");
         auth = FirebaseAuth.DefaultInstance;
@@ -90,12 +90,14 @@ public class ChecklistManager : MonoBehaviour {
         AuthStateChanged(this, null);
     }
 
+    // Sets up Firestore
     void InitializeFirestore() {
         Debug.Log("Setting up Firestore");
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
-        // Further Firestore initializations (if required)
+        // Already initialized db at the start, additional setup can be added here
     }
 
+    // Handles changes in the Firebase auth state (e.g., user logs in or out)
     void AuthStateChanged(object sender, EventArgs eventArgs) {
         if (auth.CurrentUser != user) {
             bool signedIn = user != auth.CurrentUser && auth.CurrentUser != null && auth.CurrentUser.IsValid();
@@ -111,7 +113,7 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
-    // Method to switch between different UI modes
+    // Switches UI modes between adding items and viewing the checklist
     public void SwitchMode(int mode) {
         switch (mode) {
             // Mode 0: Regular checklist view
@@ -129,6 +131,7 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
+    // Loads checklist data for the current user from Firestore
     public void LoadChecklistData() {
         // Ensure there's a logged-in user
         if (auth.CurrentUser == null) {
@@ -154,6 +157,7 @@ public class ChecklistManager : MonoBehaviour {
         });
     }
 
+    // Triggered when the user clicks to create a new checklist item
     public void OnCreateButtonClicked() {
         string itemName = itemNameInputField.text; // Get name from input field
         string itemType = itemTypeInputField.text; // Get type from input field
@@ -163,7 +167,7 @@ public class ChecklistManager : MonoBehaviour {
         SwitchMode(0);
     }
 
-        // Method to create a new checklist item
+    // Creates a new checklist item and adds it to the UI and Firestore
     public void CreateChecklistItem(string name, string type, int loadIndex = 0, bool loading = false) {
         if (!loading) {
             // Create a new checklist item locally
@@ -187,7 +191,7 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
-
+    // Saves all current checklist items to Firestore under the current user's document
     public void SaveChecklistDataToFirestore() {
         if (auth.CurrentUser == null) {
             Debug.LogError("No user logged in. Cannot save checklist data.");
@@ -220,7 +224,7 @@ public class ChecklistManager : MonoBehaviour {
         });
     }
 
-
+    // Destroys a checklist item GameObject after a delay
     IEnumerator DestroyAfterDelay(GameObject item, float delay) {
     // Wait for the specified delay
     yield return new WaitForSeconds(delay);
@@ -232,7 +236,7 @@ public class ChecklistManager : MonoBehaviour {
 
     float timeToDestroy = 0.5f;
 
-    // Method to handle checklist item changes
+    // Called when a checklist item's status changes (e.g., item checked off)
     public void CheckItem(ChecklistObject item) {
         // Remove the item from the list of checklist items
         Debug.Log("Deleting item: " + item.objName);
@@ -246,6 +250,7 @@ public class ChecklistManager : MonoBehaviour {
         Debug.Log("CheckItem worked");
     }
 
+    // Updates Firestore with the current list of checklist items
     void UpdateChecklistDataInFirestore() {
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
         DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
@@ -272,8 +277,9 @@ public class ChecklistManager : MonoBehaviour {
         });
     }
 
+    // Loads checklist data from Firestore and updates the UI
     public void LoadChecklistDataFromFirestore() {
-        ClearUI(); // Clear existing data
+        // ClearUI(); // Clear existing data
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
         DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
 
@@ -300,6 +306,7 @@ public class ChecklistManager : MonoBehaviour {
     });
     }
 
+    // Clears all checklist items from the UI
     public void ClearUI() {
         checklistObjects.Clear();
         foreach (Transform child in content) {
@@ -307,10 +314,10 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
+    // Sets the current user and loads their checklist data
     public void SetUser(string userId) {
         // Clear existing tasks
         checklistObjects.Clear();
-
         // Clear UI
         ClearUI();
 
@@ -323,7 +330,9 @@ public class ChecklistManager : MonoBehaviour {
         }
     }
 
+    // Clears all data related to the current user
     public void ClearUserData() {
+        // Clears the list of checklist objects
         checklistObjects.Clear();
     }
 

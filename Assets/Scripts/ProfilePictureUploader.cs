@@ -11,13 +11,12 @@ using SimpleFileBrowser;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
 
-
 public class ProfilePictureUploader : MonoBehaviour {
 
-    public RawImage profileImageDisplay;
-    private FirebaseStorage storage;
-    private string userId;
-    private ListenerRegistration userListenerRegistration;
+    public RawImage profileImageDisplay; // UI component for displaying the profile picture.
+    private FirebaseStorage storage; // Reference to Firebase Storage to upload/download images.
+    private string userId; // The unique identifier of the current user.
+    private string currentProfilePicturePath; // Store the current profile picture path for deletion.
 
     void Start() {
         storage = FirebaseStorage.DefaultInstance;
@@ -28,43 +27,32 @@ public class ProfilePictureUploader : MonoBehaviour {
         this.userId = userId;
         if (!string.IsNullOrEmpty(userId)) {
             LoadProfilePicture();
-            StartListeningForUserUpdates(); // Start listening for updates
-        }
-    }
-
-    void StartListeningForUserUpdates() {
-        if (string.IsNullOrEmpty(userId)) return;
-
-        var userDocRef = FirebaseFirestore.DefaultInstance.Collection("users").Document(userId);
-        userListenerRegistration = userDocRef.Listen(snapshot => {
-            if (snapshot.Exists) {
-                Debug.Log("User data updated.");
-                LoadProfilePicture(); // Reload the profile picture
-                // Add other data reloading logic here if necessary
-            }
-        });
-    }
-
-    public void StopListeningForUserUpdates() {
-        if (userListenerRegistration != null) {
-            userListenerRegistration.Stop();
-            userListenerRegistration = null;
         }
     }
 
     public void LoadProfilePicture() {
         if (string.IsNullOrEmpty(userId)) return;
 
-        // Construct the path where the image should be stored in Firebase Storage
-        string path = $"users/{userId}/profilePic.png";
-        StorageReference imageRef = storage.GetReference(path);
+        var userDocRef = FirebaseFirestore.DefaultInstance.Collection("users").Document(userId);
+        userDocRef.GetSnapshotAsync().ContinueWithOnMainThread(task => {
+            if (task.IsFaulted || task.IsCanceled) {
+                Debug.LogError("Failed to fetch user document: " + task.Exception);
+                return;
+            }
 
-        // Fetch the download URL and display the image
-        imageRef.GetDownloadUrlAsync().ContinueWithOnMainThread(task => {
-            if (!task.IsFaulted && !task.IsCanceled) {
-                StartCoroutine(DownloadImage(task.Result.ToString()));
+            DocumentSnapshot snapshot = task.Result;
+            if (snapshot.Exists && snapshot.ContainsField("profilePicturePath")) {
+                currentProfilePicturePath = snapshot.GetValue<string>("profilePicturePath");
+                StorageReference imageRef = storage.GetReference(currentProfilePicturePath);
+                imageRef.GetDownloadUrlAsync().ContinueWithOnMainThread(downloadTask => {
+                    if (!downloadTask.IsFaulted && !downloadTask.IsCanceled) {
+                        StartCoroutine(DownloadImage(downloadTask.Result.ToString()));
+                    } else {
+                        Debug.LogError("Failed to fetch profile picture URL: " + downloadTask.Exception);
+                    }
+                });
             } else {
-                Debug.LogError("Failed to fetch profile picture URL: " + task.Exception);
+                Debug.Log("Profile picture path not found.");
             }
         });
     }
@@ -87,37 +75,56 @@ public class ProfilePictureUploader : MonoBehaviour {
 
     IEnumerator ShowLoadDialogCoroutine() {
         yield return FileBrowser.WaitForLoadDialog(FileBrowser.PickMode.Files, false, null, null, "Load Image", "Load");
-
         if (FileBrowser.Success) {
+            // Delete the old picture from storage if it exists.
+            if (!string.IsNullOrEmpty(currentProfilePicturePath)) {
+                DeleteOldProfilePicture(currentProfilePicturePath);
+            }
             UploadProfilePicture(FileBrowser.Result[0]);
         }
+    }
+
+    private void DeleteOldProfilePicture(string path) {
+        StorageReference oldImageRef = storage.GetReference(path);
+        oldImageRef.DeleteAsync().ContinueWithOnMainThread(task => {
+            if (task.IsFaulted || task.IsCanceled) {
+                Debug.LogError("Error deleting old profile picture: " + task.Exception);
+            } else {
+                Debug.Log("Old profile picture deleted successfully.");
+            }
+        });
     }
 
     private void UploadProfilePicture(string selectedFilePath) {
         if (string.IsNullOrEmpty(userId)) return;
 
-        // Get a valid file path in the local app directory
-        string localFilePath = Path.Combine(Application.persistentDataPath, Path.GetFileName(selectedFilePath));
-        try {
-            File.Copy(selectedFilePath, localFilePath, true);
-        } catch (Exception ex) {
-            Debug.LogError("Error copying file: " + ex.Message);
-            return;
-        }
+        string uniqueFileName = $"profilePic_{DateTime.Now.Ticks}.png";
+        string newPath = $"users/{userId}/{uniqueFileName}";
 
-        string path = $"users/{userId}/profilePic.png";
-        StorageReference imageRef = storage.GetReference(path);
-
-        imageRef.PutFileAsync(localFilePath).ContinueWithOnMainThread(task => {
+        StorageReference newImageRef = storage.GetReference(newPath);
+        newImageRef.PutFileAsync(selectedFilePath).ContinueWithOnMainThread(task => {
             if (task.IsFaulted || task.IsCanceled) {
                 Debug.LogError("Profile picture upload failed: " + task.Exception);
             } else {
+                // Update Firestore with the new picture's path
+                SaveProfilePicturePathToFirestore(userId, newPath);
                 Debug.Log("Profile picture uploaded successfully.");
-                LoadProfilePicture(); // Reload the profile picture
+                currentProfilePicturePath = newPath; // Update the current picture path
+                LoadProfilePicture(); // Reload the new profile picture
             }
         });
     }
 
+    private void SaveProfilePicturePathToFirestore(string userId, string path) {
+        var userDocRef = FirebaseFirestore.DefaultInstance.Collection("users").Document(userId);
+        userDocRef.UpdateAsync("profilePicturePath", path).ContinueWithOnMainThread(task => {
+            if (task.IsFaulted) {
+                Debug.LogError("Failed to save profile picture path: " + task.Exception);
+            } else {
+                Debug.Log("Profile picture path saved successfully.");
+            }
+        });
+    }
 
     public void ClearProfilePicture() {
         profileImageDisplay.texture = null;
