@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 // Represents an individual checklist item within the UI
 public class ChecklistObject : MonoBehaviour {
+
+    public string id;
     public string objName; // Title of the task
     public string type; // Content of the task
     public int index; // Index of the item in the list
@@ -25,8 +27,8 @@ public class ChecklistObject : MonoBehaviour {
     }
 
     // Sets the checklist item's information and updates the UI accordingly
-    public void SetObjectInfo(string titleTxt, string content, int index) {
-        Debug.Log($"Setting info: {titleTxt}, {content}, {index}");
+    public void SetObjectInfo(string itemId, string titleTxt, string content, int index) {
+        id = itemId;
         objName = titleTxt;
         type = content;
         this.index = index;

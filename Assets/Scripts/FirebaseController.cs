@@ -26,12 +26,13 @@ public class FirebaseController : MonoBehaviour {
     // UI elements for various pages and input fields
     public GameObject loginPage, createUserPage, mainPage, forgotPassPage, notificationPanel;
     public TMP_InputField loginEmail, loginPassword, signupEmail, signupPassword,signupConfirmPassword, signupUserName,forgetPassEmail;
-    public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text;
+    public TMP_Text errorTitleText, errorMessage, profileUserName_Text, profileUserEmail_Text, profileUserId_Text;
 
     // Flag to check if a user is signed in
     bool isSignIn = false;
 
     void Start() {
+        OpenLoginPage();
         // Check and fix Firebase dependencies at the start
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task => {
             var dependencyStatus = task.Result;
@@ -111,6 +112,7 @@ public class FirebaseController : MonoBehaviour {
     // Method to log out the current user
     public void Logout() {
         auth.SignOut();
+        profileUserId_Text.text = "";
         profileUserEmail_Text.text = "";
         profileUserName_Text.text = "";
 
@@ -171,6 +173,7 @@ public class FirebaseController : MonoBehaviour {
                 // Successfully signed in
                 AuthResult newUser = task.Result;
                 Debug.LogFormat("User signed in successfully: {0} ({1})", newUser.User.DisplayName, newUser.User.UserId);
+                profileUserId_Text.text = newUser.User.UserId;
                 profileUserName_Text.text = newUser.User.DisplayName;
                 profileUserEmail_Text.text = newUser.User.Email;
 
@@ -274,6 +277,7 @@ public class FirebaseController : MonoBehaviour {
         if (isSignIn) {
             if (!isSigned) {
                 isSigned = true;
+                profileUserId_Text.text = user.UserId;
                 profileUserName_Text.text = user.DisplayName;
                 profileUserEmail_Text.text = user.Email;
                 OpenMainPage();

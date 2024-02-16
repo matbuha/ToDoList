@@ -31,12 +31,14 @@ public class ChecklistManager : MonoBehaviour {
     // Represents a single checklist item
     [Serializable]
     public class ChecklistItem {
+        public string id; // Unique identifier for the checklist item
         public string objName;
         public string type;
         public int index;
 
         // Constructor to initialize a new checklist item
-        public ChecklistItem(string name, string content, int index) {
+        public ChecklistItem(string id,string name, string content, int index) {
+            this.id = id;
             this.objName = name;
             this.type = content;
             this.index = index;
@@ -45,6 +47,7 @@ public class ChecklistManager : MonoBehaviour {
         // Converts the checklist item to a dictionary for Firestore storage
         public Dictionary<string, object> ToDictionary() {
             Dictionary<string, object> dictionary = new Dictionary<string, object>();
+            dictionary["id"] = id; // Include ID in the dictionary
             dictionary["objName"] = objName;
             dictionary["type"] = type;
             dictionary["index"] = index;
@@ -53,10 +56,11 @@ public class ChecklistManager : MonoBehaviour {
 
         // Creates a ChecklistItem instance from a Firestore document
         public static ChecklistItem FromDictionary(Dictionary<string, object> dictionary) {
+            string id = dictionary["id"] as string; // Retrieve ID from the dictionary
             string name = dictionary["objName"] as string;
             string content = dictionary["type"] as string;
             int index = Convert.ToInt32(dictionary["index"]);
-            return new ChecklistItem(name, content, index);
+            return new ChecklistItem(id, name, content, index);
         }
     }
 
@@ -159,23 +163,25 @@ public class ChecklistManager : MonoBehaviour {
 
     // Triggered when the user clicks to create a new checklist item
     public void OnCreateButtonClicked() {
+        string itemId = Guid.NewGuid().ToString(); // Generate a unique ID for the new item
         string itemName = itemNameInputField.text; // Get name from input field
         string itemType = itemTypeInputField.text; // Get type from input field
         int itemIndex = checklistObjects.Count; // Index can be the count of existing items
 
-        CreateChecklistItem(itemName, itemType, itemIndex);
+        CreateChecklistItem(itemId, itemName, itemType, itemIndex);
         SwitchMode(0);
     }
 
     // Creates a new checklist item and adds it to the UI and Firestore
-    public void CreateChecklistItem(string name, string type, int loadIndex = 0, bool loading = false) {
+    public void CreateChecklistItem(string itemId, string name, string type, int loadIndex = 0, bool loading = false) {
         if (!loading) {
             // Create a new checklist item locally
             GameObject item = Instantiate(checklistItemPrefab);
             item.transform.SetParent(content, false); // Set 'false' for worldPositionStays to maintain local orientation and scale
+
             ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
             int index = checklistObjects.Count;
-            itemObject.SetObjectInfo(name, type, index);
+            itemObject.SetObjectInfo(itemId, name, type, index);
             checklistObjects.Add(itemObject);
 
             // Save all checklist items to Firestore
@@ -186,7 +192,7 @@ public class ChecklistManager : MonoBehaviour {
             GameObject item = Instantiate(checklistItemPrefab);
             item.transform.SetParent(content, false); // Set 'false' for worldPositionStays to maintain local orientation and scale
             ChecklistObject itemObject = item.GetComponent<ChecklistObject>();
-            itemObject.SetObjectInfo(name, type, loadIndex);
+            itemObject.SetObjectInfo(itemId, name, type, loadIndex);
             checklistObjects.Add(itemObject);
         }
     }
@@ -204,6 +210,7 @@ public class ChecklistManager : MonoBehaviour {
         List<Dictionary<string, object>> itemsData = new List<Dictionary<string, object>>();
         foreach (var checklistObj in checklistObjects) {
             Dictionary<string, object> itemDict = new Dictionary<string, object> {
+                {"id", checklistObj.id },
                 { "objName", checklistObj.objName },
                 { "type", checklistObj.type },
                 { "index", checklistObj.index }
@@ -231,7 +238,6 @@ public class ChecklistManager : MonoBehaviour {
 
     // Destroy the item
     Destroy(item);
-    Debug.Log("DestroyAfterDelay worked");
     }
 
     float timeToDestroy = 0.5f;
@@ -239,7 +245,6 @@ public class ChecklistManager : MonoBehaviour {
     // Called when a checklist item's status changes (e.g., item checked off)
     public void CheckItem(ChecklistObject item) {
         // Remove the item from the list of checklist items
-        Debug.Log("Deleting item: " + item.objName);
         checklistObjects.Remove(item);
 
         // Update the Firestore database
@@ -247,7 +252,6 @@ public class ChecklistManager : MonoBehaviour {
 
         // Start coroutine to destroy the item after a delay
         StartCoroutine(DestroyAfterDelay(item.gameObject, timeToDestroy));
-        Debug.Log("CheckItem worked");
     }
 
     // Updates Firestore with the current list of checklist items
@@ -260,7 +264,8 @@ public class ChecklistManager : MonoBehaviour {
         List<Dictionary<string, object>> itemsData = new List<Dictionary<string, object>>();
         foreach (var checklistItem in checklistObjects) {
             itemsData.Add(new Dictionary<string, object>{
-                { "name", checklistItem.objName },
+                {"id", checklistItem.id },
+                { "objName", checklistItem.objName },
                 { "type", checklistItem.type },
                 { "index", checklistItem.index }
             });
@@ -279,7 +284,7 @@ public class ChecklistManager : MonoBehaviour {
 
     // Loads checklist data from Firestore and updates the UI
     public void LoadChecklistDataFromFirestore() {
-        // ClearUI(); // Clear existing data
+        ClearUI(); // Clear existing data
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
         DocumentReference docRef = db.Collection("users").Document(user.UserId).Collection("checklists").Document("data");
 
@@ -295,11 +300,13 @@ public class ChecklistManager : MonoBehaviour {
             if (data.TryGetValue("items", out object itemsObj) && itemsObj is List<object> itemsList) {
                 foreach (object itemObj in itemsList) {
                     if (itemObj is Dictionary<string, object> itemDict) {
-                        string name = itemDict.TryGetValue("name", out object nameObj) ? nameObj.ToString() : "";
+                        string itemId = itemDict.TryGetValue("id", out object idObj) ? idObj.ToString() : "";
+                        string name = itemDict.TryGetValue("objName", out object nameObj) ? nameObj.ToString() : "";
                         string type = itemDict.TryGetValue("type", out object typeObj) ? typeObj.ToString() : "";
                         int index = itemDict.TryGetValue("index", out object indexObj) && int.TryParse(indexObj.ToString(), out int idx) ? idx : 0;
+
                         // Create the checklist item in the UI
-                    CreateChecklistItem(name, type, index, true);
+                    CreateChecklistItem(itemId, name, type, index, true);
                 }
             }
         }
