@@ -126,7 +126,6 @@ public class FirebaseController : MonoBehaviour {
         var profilePictureUploader = FindObjectOfType<ProfilePictureUploader>();
         if (profilePictureUploader != null) {
             profilePictureUploader.ClearProfilePicture();
-            // profilePictureUploader.StopListeningForUserUpdates();
         }
         OpenLoginPage();
     }
@@ -145,8 +144,8 @@ public class FirebaseController : MonoBehaviour {
                 // Successfully created Firebase user
                 AuthResult result = task.Result;
                 Debug.LogFormat("Firebase user created successfully: {0} ({1})", result.User.DisplayName, result.User.UserId);
-                UpdateUserProfile(UserName);
                 OpenLoginPage();
+                UpdateUserProfile(UserName);                
             }
         });
     }
@@ -357,30 +356,30 @@ public class FirebaseController : MonoBehaviour {
     }
 
     // Save user credentials locally on Android using a custom SharedPreferencesManager class
-    public void SaveCredentials(string email, string password) {
-        if (Application.platform == RuntimePlatform.Android) {
-            using (var javaClass = new AndroidJavaClass("com.yourcompany.plugin.SharedPreferencesManager")) {
-                using (var unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")) {
-                    var context = unityActivity.GetStatic<AndroidJavaObject>("currentActivity");
-                    javaClass.CallStatic("setRememberMe", context, email, password);
-                }
-            }
-        }
-    }
+    // public void SaveCredentials(string email, string password) {
+    //     if (Application.platform == RuntimePlatform.Android) {
+    //         using (var javaClass = new AndroidJavaClass("com.yourcompany.plugin.SharedPreferencesManager")) {
+    //             using (var unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")) {
+    //                 var context = unityActivity.GetStatic<AndroidJavaObject>("currentActivity");
+    //                 javaClass.CallStatic("setRememberMe", context, email, password);
+    //             }
+    //         }
+    //     }
+    // }
 
     // Load saved user credentials on Android using the custom SharedPreferencesManager class
-    public void LoadCredentials() {
-        if (Application.platform == RuntimePlatform.Android) {
-            string email = "", password = "";
-            using (var javaClass = new AndroidJavaClass("com.arielbz.ChubbyChampsANDROID.plugin.SharedPreferencesManager")) {
-                using (var unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")) {
-                    var context = unityActivity.GetStatic<AndroidJavaObject>("currentActivity");
-                    email = javaClass.CallStatic<string>("getUserEmail", context);
-                    password = javaClass.CallStatic<string>("getUserPassword", context);
-                }
-            }
-        }
-    }
+    // public void LoadCredentials() {
+    //     if (Application.platform == RuntimePlatform.Android) {
+    //         string email = "", password = "";
+    //         using (var javaClass = new AndroidJavaClass("com.arielbz.ChubbyChampsANDROID.plugin.SharedPreferencesManager")) {
+    //             using (var unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")) {
+    //                 var context = unityActivity.GetStatic<AndroidJavaObject>("currentActivity");
+    //                 email = javaClass.CallStatic<string>("getUserEmail", context);
+    //                 password = javaClass.CallStatic<string>("getUserPassword", context);
+    //             }
+    //         }
+    //     }
+    // }
 
     // Method triggered by the refresh button click to update user data and profile picture
     public void OnRefreshButtonClicked() {
