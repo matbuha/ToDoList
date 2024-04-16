@@ -1,1 +1,1 @@
-# ToDoList (Still under Development)
+# ToDoList (will be package soon)
